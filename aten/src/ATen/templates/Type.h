@@ -2,14 +2,14 @@
 
 #include <ATen/core/ATenGeneral.h>
 #include <c10/core/Allocator.h>
-#include <ATen/core/Deprecated.h>
+#include <c10/util/Deprecated.h>
 #include <ATen/core/Generator.h>
 #include <c10/core/Layout.h>
 #include <c10/core/Scalar.h>
 #include <c10/core/ScalarType.h>
 #include <ATen/core/SparseTensorRef.h>
 #include <c10/util/ArrayRef.h>
-#include <c10/Half.h>
+#include <c10/util/Half.h>
 #include <c10/core/TensorTypeIdRegistration.h>
 #include <ATen/core/Reduction.h>
 #include <c10/core/TensorOptions.h>
@@ -40,6 +40,7 @@ using TensorList = ArrayRef<Tensor>;
 
 class Context;
 struct Generator;
+struct Quantizer;
 
 static inline void noop_deleter(void*) {}
 
@@ -65,18 +66,16 @@ struct CAFFE2_API Type {
   virtual bool is_cuda() const = 0;
   virtual bool is_hip() const = 0;
   virtual bool is_sparse() const = 0;
+  virtual bool is_quantized() const = 0;
   virtual bool is_distributed() const = 0;
   bool is_variable() const noexcept { return is_variable_; }
   bool is_undefined() const noexcept { return is_undefined_; }
   virtual Allocator * allocator() const = 0;
   virtual Device getDeviceFromPtr(void * data) const = 0;
-  virtual Storage storageFromBlob(void * data, int64_t size, const std::function<void(void*)> & deleter=noop_deleter) const = 0;
-  virtual Storage storageWithAllocator(int64_t size, Allocator* allocator) const = 0;
   virtual std::unique_ptr<Generator> generator() const = 0;
   virtual Tensor unsafeTensorFromTH(void * th_pointer, bool retain) const = 0;
   virtual Storage unsafeStorageFromTH(void * th_pointer, bool retain) const = 0;
   virtual const char * toString() const = 0;
-  virtual size_t elementSizeInBytes() const = 0;
   virtual Type & toBackend(Backend b) const = 0;
   virtual Type & toScalarType(ScalarType s) const = 0;
   Type & toSparse() const {
@@ -106,23 +105,12 @@ struct CAFFE2_API Type {
     return backendToDeviceType(backend());
   }
 
-  virtual Tensor copy(
-      const Tensor& src,
-      bool non_blocking = false,
-      c10::optional<Device> to_device = {}) const = 0;
-  virtual Tensor & copy_(Tensor & self, const Tensor & src, bool non_blocking=false) const = 0;
-
   virtual void backward(
       Tensor& self,
       c10::optional<Tensor> gradient,
       bool keep_graph,
       bool create_graph) const = 0;
   virtual void set_data(Tensor & self, Tensor new_data) const = 0;
-
-  virtual Tensor tensorFromBlob(void * data, IntList sizes, const std::function<void(void*)> & deleter=noop_deleter) const = 0;
-  virtual Tensor tensorFromBlob(void * data, IntList sizes, IntList strides, const std::function<void(void*)> & deleter=noop_deleter) const = 0;
-  virtual Tensor tensorWithAllocator(IntList sizes, Allocator* allocator) const = 0;
-  virtual Tensor tensorWithAllocator(IntList sizes, IntList strides, Allocator* allocator) const = 0;
 
   bool operator==(const Type& other) const {
     return this == &other;
